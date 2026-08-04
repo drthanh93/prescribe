@@ -1492,7 +1492,7 @@ function renderPatientList(filter){
       <td>${esc(p.phone||'')}</td>
       <td style="text-align:center">${info.count}</td>
       <td>${info.last?fmtDate(info.last):'—'}</td>
-      <td>${recallBadge(info.next)}</td>
+      <td>${recallBadge(info.next)}${info.next?` <button class="btn-sm btn-new" style="margin-left:4px" onclick="event.stopPropagation();reexam('${p.id}')">🔁 Tái khám</button>`:''}</td>
     </tr>`;
   }).join(''):'<tr><td colspan="6" style="text-align:center;color:#7a8aa0;padding:18px">Chưa có bệnh nhân. Hãy kê và lưu một đơn thuốc.</td></tr>';
 
@@ -1553,6 +1553,7 @@ function newRxFor(pid){
   currentPatientId=pid;fillForm(p);
   newRx(true);closeModal('ptOverlay');
 }
+function reexam(pid){var p=patients.find(function(x){return x.id===pid;});if(!p)return;var info=visitInfo(pid);var last=info.rxs&&info.rxs[0];if(last){copyRx(last.id);toast('Tái khám '+(p.name||'')+' — giữ nguyên chẩn đoán & toa cũ ('+fmtDate(last.date)+')');return;}currentPatientId=pid;fillForm(p);newRx(true);if(typeof showRxForm==='function')showRxForm();showBanner();toast('Kê đơn tái khám cho '+(p.name||''));}
 function copyRx(id){
   const rx=rxAll.find(r=>r.id===id);if(!rx)return;
   currentPatientId=rx.patientId||null;editingRxId=null;
