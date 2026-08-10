@@ -1434,8 +1434,9 @@ function editDrug(i,k,v){drugs[i][k]=k==='price'?(Number(v)||0):v.trim();saveDru
 function addDrug(){
   const nm=$('newDrugName').value.trim();const pr=Number($('newDrugPrice').value)||0;
   if(!nm){toast('Nhập tên thuốc');return;}
-  if(drugs.some(d=>d.name===nm&&(d.kho||'pk')===curKho)){toast('Thuốc đã có trong kho này');return;}
   const i=DRUG_INFO[nm]||[];
+  const _ham=($('newDrugHam').value.trim()||i[1]||'');
+  if(drugs.some(d=>d.name===nm&&((d.ham||'').trim().toLowerCase()===_ham.trim().toLowerCase())&&(d.kho||'pk')===curKho)){toast('Thuốc này (cùng tên + hàm lượng) đã có trong kho');return;}
   drugs.push({name:nm,price:pr,kho:curKho,
     hc:$('newDrugHC').value.trim()||i[0]||'',
     ham:$('newDrugHam').value.trim()||i[1]||'',
@@ -1456,12 +1457,11 @@ function visitInfo(pid){
   return {count:rxs.length,last,next,rxs};
 }
 function recallBadge(iso){
-  if(!iso)return '<span class="badge none">—</span>';
+  if(!iso)return '—';
   const d=daysFromToday(iso);
-  if(d<0)return `<span class="badge over">Quá hạn ${-d} ngày</span>`;
-  if(d===0)return '<span class="badge today">Hôm nay</span>';
-  if(d<=7)return `<span class="badge soon">${d} ngày nữa</span>`;
-  return `<span class="badge future">${fmtDate(iso)}</span>`;
+  const c=(d<0)?'#c62828':(d===0?'#e65100':(d<=7?'#ef6c00':'#1b5e20'));
+  const tip=(d<0)?('Quá hạn '+(-d)+' ngày'):(d===0?'Hôm nay':(d<=7?(d+' ngày nữa'):''));
+  return `<span style="color:${c};font-weight:600" title="${tip}">${fmtDate(iso)}</span>`;
 }
 
 function openPatients(){showTab('patients');}
@@ -1488,13 +1488,14 @@ function renderPatientList(filter){
     const{p,info}=o;
     return `<tr class="pt-row" onclick="openPatientDetail('${p.id}')">
       <td><b>${esc((p.name||'').toUpperCase())}</b></td>
-      <td>${esc(p.year||'')}</td>
+      <td style="text-align:center">${esc(p.year||'')}</td>
       <td>${esc(p.phone||'')}</td>
       <td style="text-align:center">${info.count}</td>
-      <td>${info.last?fmtDate(info.last):'—'}</td>
-      <td>${recallBadge(info.next)}${info.next?` <button class="btn-sm btn-new" style="margin-left:4px" onclick="event.stopPropagation();reexam('${p.id}')">🔁 Tái khám</button>`:''}</td>
+      <td style="text-align:center">${info.last?fmtDate(info.last):'—'}</td>
+      <td style="text-align:center">${recallBadge(info.next)}</td>
+      <td style="text-align:center">${info.next?`<button class="btn-sm btn-new" onclick="event.stopPropagation();reexam('${p.id}')">🔁 Tái khám</button>`:''}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="6" style="text-align:center;color:#7a8aa0;padding:18px">Chưa có bệnh nhân. Hãy kê và lưu một đơn thuốc.</td></tr>';
+  }).join(''):'<tr><td colspan="7" style="text-align:center;color:#7a8aa0;padding:18px">Chưa có bệnh nhân. Hãy kê và lưu một đơn thuốc.</td></tr>';
 
   $('ptView').innerHTML=`
     <h3>👥 Danh sách bệnh nhân (${rows.length})</h3>
@@ -1502,13 +1503,14 @@ function renderPatientList(filter){
     <input class="search-in" placeholder="🔍 Tìm theo tên hoặc SĐT..." value="${esc(filter||'')}"
       oninput="renderPatientList(this.value)" autofocus>
     <div style="max-height:420px;overflow:auto;">
-      <table>
-        <thead><tr><th style="width:26%">Bệnh nhân</th><th style="width:12%">Năm sinh</th><th style="width:16%">SĐT</th><th style="width:12%;text-align:center">Số lần</th><th style="width:17%">Khám gần nhất</th><th style="width:17%">Tái khám</th></tr></thead>
+      <table id="ptTable">
+        <thead><tr><th style="width:auto">Bệnh nhân</th><th style="width:78px;text-align:center">Năm sinh</th><th style="width:110px">SĐT</th><th style="width:62px;text-align:center">Số lần</th><th style="width:100px;text-align:center">Ngày khám</th><th style="width:100px;text-align:center">Tái khám</th><th style="width:112px;text-align:center"></th></tr></thead>
         <tbody>${body}</tbody>
       </table>
     </div>`;
   // giữ con trỏ ô tìm kiếm
   const s=$('ptView').querySelector('.search-in');if(filter!=null&&s){s.focus();s.setSelectionRange(s.value.length,s.value.length);}
+  try{initColResizeFor('#ptTable','rx_ptcolw');}catch(e){}
 }
 
 function viewProfile(){if(!currentPatientId){toast('Chưa lưu đơn nên chưa có hồ sơ. Lưu đơn trước.');return;}showTab('patients');openPatientDetail(currentPatientId);}
@@ -1644,6 +1646,22 @@ function doPrint(){buildPrintView();window.print();}
 window.addEventListener('beforeprint',buildPrintView);
 
 /* Kéo chỉnh độ rộng cột bảng thuốc */
+function initColResizeFor(sel,key){
+  var ths=document.querySelectorAll(sel+' thead th');
+  ths.forEach(function(th){
+    if(th.querySelector('.col-resizer'))return;
+    th.style.position='relative';
+    var h=document.createElement('div');h.className='col-resizer';th.appendChild(h);
+    h.addEventListener('mousedown',function(e){e.preventDefault();e.stopPropagation();
+      var sx=e.pageX,sw=th.offsetWidth;
+      var mm=function(ev){th.style.width=Math.max(36,sw+(ev.pageX-sx))+'px';};
+      var mu=function(){document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);
+        jset(key,[].map.call(document.querySelectorAll(sel+' thead th'),function(t){return t.style.width||'';}));};
+      document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
+    });
+  });
+  var ws=jget(key,null);if(Array.isArray(ws))ws.forEach(function(w,i){if(w&&ths[i])ths[i].style.width=w;});
+}
 function saveColW(){jset('rx_colw',[...document.querySelectorAll('#rxTable thead th')].map(t=>t.style.width||''));}
 function restoreColW(){const ws=jget('rx_colw',null);if(!Array.isArray(ws))return;const ths=document.querySelectorAll('#rxTable thead th');ws.forEach((w,i)=>{if(w&&ths[i])ths[i].style.width=w;});}
 function initColResize(){
